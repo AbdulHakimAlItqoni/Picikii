@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Simulasi Proyektil 2D – Tanpa & Dengan Drag</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{margin:0;font-family:Segoe UI,sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);color:white}
+header{text-align:center;padding:16px}
+.container{display:grid;grid-template-columns:320px 1fr;gap:16px;padding:16px}
+.panel{background:rgba(255,255,255,0.15);backdrop-filter:blur(10px);border-radius:16px;padding:16px}
+label{display:block;margin-top:10px;font-size:.9rem}
+input,select,button{width:100%;padding:8px;margin-top:4px;border:none;border-radius:8px}
+button{margin-top:14px;background:linear-gradient(135deg,#ff6a00,#ee0979);color:white;font-weight:bold;cursor:pointer}
+canvas{width:100%;background:linear-gradient(#87ceeb,#e0f7fa);border-radius:16px}
+.result{font-size:.85rem;line-height:1.6;margin-top:12px}
+</style>
+</head>
+<body>
+<header>
+<h1>Simulasi Proyektil 2D</h1>
+<p>Perbandingan Tanpa Drag dan Dengan Drag</p>
+</header>
+
+<div class="container">
+<div class="panel">
+<label>Mode Simulasi</label>
+<select id="mode">
+<option value="nodrag">Tanpa Drag</option>
+<option value="drag">Dengan Drag</option>
+</select>
+<label>Kecepatan Awal v₀ (m/s)</label>
+<input id="v0" type="number" value="30">
+<label>Sudut θ (derajat)</label>
+<input id="angle" type="number" value="45">
+<label>Massa m (kg)</label>
+<input id="mass" type="number" value="1">
+<label>Gravitasi g (m/s²)</label>
+<input id="g" type="number" value="9.8">
+<label>Koefisien Drag b</label>
+<input id="b" type="number" step="0.01" value="0.1">
+<button onclick="simulate()">Hitung & Tampilkan</button>
+<div class="result" id="result"></div>
+</div>
+
+<div class="panel">
+<canvas id="canvas" width="900" height="480"></canvas>
+</div>
+</div>
+
+<script>
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+const groundY=canvas.height-60;
+const startX=120;
+const startY=groundY;
+
+function drawScene(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ // langit
+ ctx.fillStyle='#87ceeb';ctx.fillRect(0,0,canvas.width,groundY);
+ // matahari
+ ctx.fillStyle='#ffeb3b';ctx.beginPath();ctx.arc(canvas.width-90,90,35,0,Math.PI*2);ctx.fill();
+ // awan
+ ctx.fillStyle='rgba(255,255,255,0.8)';ctx.beginPath();ctx.ellipse(220,90,70,25,0,0,Math.PI*2);ctx.fill();
+ // tanah
+ ctx.fillStyle='#4caf50';ctx.fillRect(0,groundY,canvas.width,canvas.height-groundY);
+ // pohon
+ ctx.fillStyle='#6d4c41';ctx.fillRect(60,groundY-90,18,60);
+ ctx.fillStyle='#2e7d32';ctx.beginPath();ctx.arc(69,groundY-110,35,0,Math.PI*2);ctx.fill();
+ // rumah
+ ctx.fillStyle='#ffccbc';ctx.fillRect(canvas.width-220,groundY-100,120,80);
+ ctx.fillStyle='#d84315';ctx.beginPath();ctx.moveTo(canvas.width-240,groundY-100);ctx.lineTo(canvas.width-160,groundY-150);ctx.lineTo(canvas.width-80,groundY-100);ctx.fill();
+ // orang (statis)
+ ctx.fillStyle='#000';ctx.beginPath();ctx.arc(startX,startY-70,12,0,Math.PI*2);ctx.fill();ctx.fillRect(startX-4,startY-55,8,40);
+}
+
+function simulate(){
+ drawScene();
+ document.getElementById('result').innerHTML='';
+
+ const v0=+v0Input.value;
+ const theta=+angleInput.value*Math.PI/180;
+ const m=+massInput.value;
+ const g=+gInput.value;
+ const b=+bInput.value;
+ const mode=document.getElementById('mode').value;
+
+ let points=[];
+ let t=0,dt=0.01;
+ let x=0,y=0;
+ let vx=v0*Math.cos(theta);
+ let vy=v0*Math.sin(theta);
+ let maxY=0;
+
+ if(mode==='nodrag'){
+   // rumus analitik (AKURAT)
+   const time=2*v0*Math.sin(theta)/g;
+   const range=v0*Math.cos(theta)*time;
+   const hmax=(v0*v0*Math.sin(theta)*Math.sin(theta))/(2*g);
+   for(let tt=0;tt<=time;tt+=dt){
+     x=v0*Math.cos(theta)*tt;
+     y=v0*Math.sin(theta)*tt-0.5*g*tt*tt;
+     points.push({x,y});
+   }
+   drawTrajectory(points,'#2979ff');
+   showResult(time,range,hmax);
+ }else{
+   // numerik (Euler) untuk drag
+   x=0;y=0;
+   while(y>=0){
+     let ax=-(b/m)*vx;
+     let ay=-g-(b/m)*vy;
+     vx+=ax*dt;
+     vy+=ay*dt;
+     x+=vx*dt;
+     y+=vy*dt;
+     maxY=Math.max(maxY,y);
+     points.push({x,y});
+     t+=dt;
+   }
+   drawTrajectory(points,'#ff1744');
+   showResult(t,x,maxY);
+ }
+}
+
+function drawTrajectory(points,color){
+ ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();
+ points.forEach((p,i)=>{
+   const px=startX+p.x*5;
+   const py=groundY-p.y*5;
+   i?ctx.lineTo(px,py):ctx.moveTo(px,py);
+ });
+ ctx.stroke();
+}
+
+function showResult(time,range,height){
+ document.getElementById('result').innerHTML=
+ `<b>Hasil Lemparan</b><br>`+
+ `Waktu terbang: ${time.toFixed(2)} s<br>`+
+ `Jangkauan: ${range.toFixed(2)} m<br>`+
+ `Tinggi maksimum: ${height.toFixed(2)} m`;
+}
+
+const v0Input=document.getElementById('v0');
+const angleInput=document.getElementById('angle');
+const massInput=document.getElementById('mass');
+const gInput=document.getElementById('g');
+const bInput=document.getElementById('b');
+
+drawScene();
+</script>
+</body>
+</html>
